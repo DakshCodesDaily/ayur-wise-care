@@ -17,13 +17,6 @@ import {
 
 const features = [
   {
-    icon: Users,
-    title: "Multi-Role Management",
-    description: "Separate dashboards for Patients, Practitioners, and Admin with role-based access control.",
-    color: "primary",
-    gradient: "bg-gradient-primary"
-  },
-  {
     icon: Calendar,
     title: "Smart Scheduling",
     description: "Automated therapy booking with conflict detection and intelligent scheduling algorithms.",

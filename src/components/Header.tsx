@@ -36,8 +36,12 @@ const Header = () => {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost">Sign In</Button>
-            <Button variant="hero">Get Started</Button>
+            <Button variant="ghost" onClick={() => alert('Please select your role:\n\n• Patient - Book and manage your therapy sessions\n• Practitioner - Manage patient schedules and treatments')}>
+              Sign In
+            </Button>
+            <Button variant="hero" onClick={() => alert('Please select your role to get started:\n\n• Patient - Book and manage your therapy sessions\n• Practitioner - Manage patient schedules and treatments')}>
+              Get Started
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -70,8 +74,12 @@ const Header = () => {
             </a>
           </nav>
           <div className="flex flex-col space-y-2 pt-4 border-t border-border">
-            <Button variant="ghost" className="justify-start">Sign In</Button>
-            <Button variant="hero" className="justify-start">Get Started</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => alert('Please select your role:\n\n• Patient - Book and manage your therapy sessions\n• Practitioner - Manage patient schedules and treatments')}>
+              Sign In
+            </Button>
+            <Button variant="hero" className="justify-start" onClick={() => alert('Please select your role to get started:\n\n• Patient - Book and manage your therapy sessions\n• Practitioner - Manage patient schedules and treatments')}>
+              Get Started
+            </Button>
           </div>
         </div>
       </div>
