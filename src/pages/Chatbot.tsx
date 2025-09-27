@@ -106,6 +106,24 @@ const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     { id: "m1", role: "assistant", text: "Namaste! I'm your AI assistant with expertise in Ayurveda and general knowledge. Ask me anything - about Panchakarma, health, technology, science, or any other topic!" },
   ]);
+
+  const ayurvedaQuestions = [
+    "What is Panchakarma therapy?",
+    "What are the benefits of Abhyanga massage?",
+    "How does Shirodhara help with stress?",
+    "What is the Ayurvedic diet for Vata dosha?",
+    "What herbs are good for digestion?",
+    "How to balance Pitta dosha?",
+    "What is Basti therapy?",
+    "What are the side effects of Panchakarma?",
+    "How long does a Panchakarma treatment take?",
+    "What should I eat during Panchakarma?",
+    "What is the difference between Vamana and Virechana?",
+    "How does Nasya therapy work?",
+    "What is Raktamokshana used for?",
+    "What are the contraindications for Panchakarma?",
+    "How to prepare for Panchakarma therapy?"
+  ];
   const [isLoading, setIsLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -154,10 +172,10 @@ const Chatbot = () => {
           <CardTitle>AI Assistant {user ? `· Welcome, ${user.name}` : ""}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 mb-3">
-            <Label>Language</Label>
+          <div className="flex items-center gap-2 mb-4">
+            <Label className="font-semibold">Language</Label>
             <select
-              className="h-10 rounded-md border border-input bg-background px-3"
+              className="h-10 rounded-xl border border-slate-300 bg-background px-3 focus:border-emerald-500 focus:ring-emerald-500"
               value={lang}
               onChange={(e) => setLang(e.target.value)}
             >
@@ -167,6 +185,24 @@ const Chatbot = () => {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Ayurveda Question Suggestions */}
+          <div className="mb-4">
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Try these Ayurveda questions:</Label>
+            <div className="flex flex-wrap gap-2">
+              {ayurvedaQuestions.slice(0, 6).map((question, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInput(question)}
+                  className="text-xs rounded-full border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700"
+                >
+                  {question}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <div className="h-[50vh] overflow-y-auto border rounded-2xl p-4 space-y-4 bg-slate-50">

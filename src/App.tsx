@@ -6,8 +6,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import EnhancedLogin from "./pages/EnhancedLogin";
 import Schedule from "./pages/Schedule";
 import Chatbot from "./pages/Chatbot";
+import Notifications from "./pages/Notifications";
 import { isAuthenticated } from "@/lib/auth";
 
 const queryClient = new QueryClient();
@@ -21,8 +23,10 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<EnhancedLogin />} />
           <Route path="/schedule" element={isAuthenticated() ? <Schedule /> : <Navigate to="/login" replace />} />
           <Route path="/chatbot" element={<Chatbot />} />
+          <Route path="/notifications" element={isAuthenticated() ? <Notifications /> : <Navigate to="/login" replace />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -30,12 +30,13 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="/" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Home</a>
-            <a href="/schedule" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Schedule</a>
-            <a href="/chatbot" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Chatbot</a>
-          </nav>
+              {/* Desktop Navigation */}
+              <nav className="hidden md:flex items-center space-x-8">
+                <a href="/" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Home</a>
+                <a href="/schedule" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Schedule</a>
+                <a href="/chatbot" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Chatbot</a>
+                {user && <a href="/notifications" className="text-slate-700 hover:text-emerald-600 font-semibold transition-colors duration-200">Notifications</a>}
+              </nav>
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
@@ -96,11 +97,12 @@ const Header = () => {
           "md:hidden mt-6 space-y-4 transition-all duration-300",
           isMenuOpen ? "opacity-100 max-h-96" : "opacity-0 max-h-0 overflow-hidden"
         )}>
-          <nav className="flex flex-col space-y-3">
-            <a href="/" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Home</a>
-            <a href="/schedule" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Schedule</a>
-            <a href="/chatbot" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Chatbot</a>
-          </nav>
+              <nav className="flex flex-col space-y-3">
+                <a href="/" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Home</a>
+                <a href="/schedule" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Schedule</a>
+                <a href="/chatbot" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Chatbot</a>
+                {user && <a href="/notifications" className="p-3 text-slate-700 hover:text-emerald-600 font-semibold rounded-xl hover:bg-slate-50 transition-all duration-200">Notifications</a>}
+              </nav>
           <div className="flex flex-col space-y-3 pt-4 border-t border-slate-200">
             {!user ? (
               <>

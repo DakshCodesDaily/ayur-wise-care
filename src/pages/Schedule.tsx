@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/lib/auth";
+import { generateTherapyNotifications } from "@/lib/notifications";
+import { Calendar, Clock, User, Stethoscope, Plus, Edit, Trash2, TrendingUp, Activity, CheckCircle2 } from "lucide-react";
 
 type TherapySession = {
   id: string;
@@ -14,6 +17,20 @@ type TherapySession = {
   start: string; // HH:mm
   end: string; // HH:mm
   therapy: string;
+  status: "scheduled" | "completed" | "cancelled" | "in-progress";
+  notes?: string;
+  progress?: number; // 0-100
+};
+
+type PatientProgress = {
+  id: string;
+  patientName: string;
+  totalSessions: number;
+  completedSessions: number;
+  currentTherapy: string;
+  progress: number;
+  lastSession: string;
+  nextSession?: string;
 };
 
 const STORAGE_KEY = "ayursutra.therapy.sessions";
@@ -47,17 +64,48 @@ function isConflict(a: TherapySession, b: TherapySession) {
 
 const practitioners = ["Dr. Sharma", "Dr. Iyer", "Therapist Rao"]; // seed
 
+const therapyTypes = [
+  "Abhyanga (Oil Massage)",
+  "Shirodhara (Oil Pouring)",
+  "Basti (Enema Therapy)",
+  "Vamana (Therapeutic Vomiting)",
+  "Virechana (Purgation)",
+  "Nasya (Nasal Therapy)",
+  "Raktamokshana (Bloodletting)",
+  "Udvartana (Herbal Powder Massage)",
+  "Pizhichil (Oil Bath)",
+  "Kizhi (Herbal Bundle Massage)"
+];
+
+const PROGRESS_STORAGE_KEY = "ayursutra.patient.progress";
+
+function loadPatientProgress(): PatientProgress[] {
+  try {
+    const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PatientProgress[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePatientProgress(progress: PatientProgress[]) {
+  localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+}
+
 const Schedule = () => {
   const navigate = useNavigate();
   const user = getCurrentUser();
   const [sessions, setSessions] = useState<TherapySession[]>(loadSessions());
+  const [patientProgress, setPatientProgress] = useState<PatientProgress[]>(loadPatientProgress());
+  const [activeTab, setActiveTab] = useState<"schedule" | "progress" | "analytics">("schedule");
   const [form, setForm] = useState({
     patientName: user?.role === "patient" ? user.name : "",
     practitionerName: practitioners[0],
     date: "",
     start: "10:00",
     end: "11:00",
-    therapy: "Abhyanga",
+    therapy: therapyTypes[0],
+    notes: "",
   });
 
   useEffect(() => {
@@ -67,6 +115,10 @@ const Schedule = () => {
   useEffect(() => {
     saveSessions(sessions);
   }, [sessions]);
+
+  useEffect(() => {
+    savePatientProgress(patientProgress);
+  }, [patientProgress]);
 
   const mySessions = useMemo(() => {
     if (!user) return [] as TherapySession[];
@@ -84,13 +136,62 @@ const Schedule = () => {
       start: form.start,
       end: form.end,
       therapy: form.therapy,
+      status: "scheduled",
+      notes: form.notes,
+      progress: 0,
     };
     if (!newItem.date) return alert("Please select date");
     if (isNaN(Date.parse(newItem.date))) return alert("Invalid date");
 
     const conflict = sessions.some((s) => isConflict(s, newItem));
     if (conflict) return alert("Time conflict for selected practitioner.");
+    
     setSessions((prev) => [...prev, newItem]);
+    
+    // Update patient progress
+    updatePatientProgress(newItem.patientName, newItem.therapy);
+    
+    // Generate therapy notifications
+    const notifications = generateTherapyNotifications(newItem.therapy, newItem.date);
+    notifications.forEach(notification => {
+      // Store notifications in localStorage
+      const existingNotifications = JSON.parse(localStorage.getItem("ayursutra.notifications") || "[]");
+      existingNotifications.push(notification);
+      localStorage.setItem("ayursutra.notifications", JSON.stringify(existingNotifications));
+    });
+    
+    // Reset form
+    setForm({
+      patientName: user?.role === "patient" ? user.name : "",
+      practitionerName: practitioners[0],
+      date: "",
+      start: "10:00",
+      end: "11:00",
+      therapy: therapyTypes[0],
+      notes: "",
+    });
+  }
+
+  function updatePatientProgress(patientName: string, therapy: string) {
+    const existing = patientProgress.find(p => p.patientName === patientName);
+    if (existing) {
+      setPatientProgress(prev => prev.map(p => 
+        p.patientName === patientName 
+          ? { ...p, totalSessions: p.totalSessions + 1, currentTherapy: therapy }
+          : p
+      ));
+    } else {
+      const newProgress: PatientProgress = {
+        id: Math.random().toString(36).slice(2, 10),
+        patientName,
+        totalSessions: 1,
+        completedSessions: 0,
+        currentTherapy: therapy,
+        progress: 0,
+        lastSession: new Date().toISOString().split('T')[0],
+      };
+      setPatientProgress(prev => [...prev, newProgress]);
+    }
   }
 
   function remove(id: string) {
@@ -108,97 +209,358 @@ const Schedule = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{user?.role === "patient" ? "Book a Therapy Session" : "Manage Therapy Schedule"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-6 gap-3 items-end">
-            {user?.role !== "patient" && (
-              <div className="md:col-span-2">
-                <Label>Patient Name</Label>
-                <Input value={form.patientName} onChange={(e) => setForm({ ...form, patientName: e.target.value })} placeholder="Patient" />
-              </div>
-            )}
-            {user?.role === "patient" && (
-              <div className="md:col-span-2">
-                <Label>Patient Name</Label>
-                <Input value={form.patientName} readOnly />
-              </div>
-            )}
-            <div>
-              <Label>Practitioner</Label>
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3"
-                value={form.practitionerName}
-                onChange={(e) => setForm({ ...form, practitionerName: e.target.value })}
-              >
-                {practitioners.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Date</Label>
-              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-            </div>
-            <div>
-              <Label>Start</Label>
-              <Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
-            </div>
-            <div>
-              <Label>End</Label>
-              <Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
-            </div>
-            <div className="md:col-span-2">
-              <Label>Therapy</Label>
-              <Input value={form.therapy} onChange={(e) => setForm({ ...form, therapy: e.target.value })} placeholder="e.g. Abhyanga" />
-            </div>
-            <div>
-              <Button onClick={book} variant="hero" className="w-full">
-                {user?.role === "patient" ? "Book" : "Add"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto p-6 space-y-8">
+      {/* Header with Tabs */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {user?.role === "patient" ? "My Therapy Sessions" : "Therapy Management"}
+          </h1>
+          <p className="text-slate-600 mt-2">
+            {user?.role === "patient" 
+              ? "Book and track your Panchakarma therapy sessions" 
+              : "Manage patient schedules and track progress"
+            }
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button 
+            variant={activeTab === "schedule" ? "default" : "outline"}
+            onClick={() => setActiveTab("schedule")}
+            className="flex items-center space-x-2"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Schedule</span>
+          </Button>
+          <Button 
+            variant={activeTab === "progress" ? "default" : "outline"}
+            onClick={() => setActiveTab("progress")}
+            className="flex items-center space-x-2"
+          >
+            <Activity className="w-4 h-4" />
+            <span>Progress</span>
+          </Button>
+          {user?.role === "practitioner" && (
+            <Button 
+              variant={activeTab === "analytics" ? "default" : "outline"}
+              onClick={() => setActiveTab("analytics")}
+              className="flex items-center space-x-2"
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>Analytics</span>
+            </Button>
+          )}
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Upcoming Sessions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {mySessions.length === 0 && <p className="text-muted-foreground">No sessions yet.</p>}
-            {mySessions
-              .slice()
-              .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
-              .map((s) => (
-                <div key={s.id} className="grid md:grid-cols-8 items-center gap-2 border rounded-md p-3">
-                  <div className="md:col-span-2 font-medium">{s.patientName}</div>
-                  <div>{s.practitionerName}</div>
-                  <div>{s.therapy}</div>
-                  <div>{s.date}</div>
-                  <div>
-                    {s.start} - {s.end}
+      {/* Schedule Tab */}
+      {activeTab === "schedule" && (
+        <>
+          {/* Booking Form */}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Plus className="w-5 h-5" />
+                <span>{user?.role === "patient" ? "Book New Session" : "Add Therapy Session"}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {user?.role !== "patient" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Patient Name</Label>
+                    <Input 
+                      value={form.patientName} 
+                      onChange={(e) => setForm({ ...form, patientName: e.target.value })} 
+                      placeholder="Enter patient name"
+                      className="rounded-xl"
+                    />
                   </div>
-                  <div className="flex gap-2 justify-end md:col-span-2">
-                    <Button variant="outline" onClick={() => {
-                      const date = prompt("New date (YYYY-MM-DD)", s.date) || s.date;
-                      const start = prompt("New start (HH:mm)", s.start) || s.start;
-                      const end = prompt("New end (HH:mm)", s.end) || s.end;
-                      reschedule(s.id, date, start, end);
-                    }}>Reschedule</Button>
-                    <Button variant="destructive" onClick={() => remove(s.id)}>Cancel</Button>
+                )}
+                {user?.role === "patient" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Patient Name</Label>
+                    <Input value={form.patientName} readOnly className="rounded-xl bg-slate-50" />
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Practitioner</Label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-slate-300 bg-background px-3 focus:border-emerald-500 focus:ring-emerald-500"
+                    value={form.practitionerName}
+                    onChange={(e) => setForm({ ...form, practitionerName: e.target.value })}
+                  >
+                    {practitioners.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Therapy Type</Label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-slate-300 bg-background px-3 focus:border-emerald-500 focus:ring-emerald-500"
+                    value={form.therapy}
+                    onChange={(e) => setForm({ ...form, therapy: e.target.value })}
+                  >
+                    {therapyTypes.map((therapy) => (
+                      <option key={therapy} value={therapy}>{therapy}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Date</Label>
+                  <Input 
+                    type="date" 
+                    value={form.date} 
+                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    className="rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Start Time</Label>
+                  <Input 
+                    type="time" 
+                    value={form.start} 
+                    onChange={(e) => setForm({ ...form, start: e.target.value })}
+                    className="rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">End Time</Label>
+                  <Input 
+                    type="time" 
+                    value={form.end} 
+                    onChange={(e) => setForm({ ...form, end: e.target.value })}
+                    className="rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                  <Label className="text-sm font-semibold">Notes</Label>
+                  <Input 
+                    value={form.notes} 
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })} 
+                    placeholder="Additional notes or special instructions"
+                    className="rounded-xl"
+                  />
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3">
+                  <Button 
+                    onClick={book} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {user?.role === "patient" ? "Book Session" : "Add Session"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Sessions List */}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Calendar className="w-5 h-5" />
+                <span>Upcoming Sessions</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {mySessions.length === 0 && (
+                  <div className="text-center py-12">
+                    <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-slate-500 text-lg">No sessions scheduled yet</p>
+                    <p className="text-slate-400">Book your first therapy session above</p>
+                  </div>
+                )}
+                {mySessions
+                  .slice()
+                  .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+                  .map((s) => (
+                    <div key={s.id} className="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-all duration-300">
+                      <div className="grid md:grid-cols-6 gap-4 items-center">
+                        <div className="md:col-span-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-emerald-100 rounded-xl">
+                              <User className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-900">{s.patientName}</p>
+                              <p className="text-sm text-slate-600">{s.practitionerName}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <p className="text-sm text-slate-600">Therapy</p>
+                          <p className="font-medium text-slate-900">{s.therapy}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="text-sm text-slate-600">Date</p>
+                          <p className="font-medium text-slate-900">{new Date(s.date).toLocaleDateString()}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="text-sm text-slate-600">Time</p>
+                          <p className="font-medium text-slate-900">{s.start} - {s.end}</p>
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                          <Badge 
+                            className={`${
+                              s.status === "scheduled" ? "bg-blue-100 text-blue-700" :
+                              s.status === "completed" ? "bg-green-100 text-green-700" :
+                              s.status === "in-progress" ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {s.status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              const date = prompt("New date (YYYY-MM-DD)", s.date) || s.date;
+                              const start = prompt("New start (HH:mm)", s.start) || s.start;
+                              const end = prompt("New end (HH:mm)", s.end) || s.end;
+                              reschedule(s.id, date, start, end);
+                            }}
+                            className="rounded-lg"
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => remove(s.id)}
+                            className="rounded-lg text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Progress Tab */}
+      {activeTab === "progress" && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Activity className="w-5 h-5" />
+              <span>Patient Progress Tracking</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {patientProgress.length === 0 && (
+                <div className="text-center py-12">
+                  <Activity className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <p className="text-slate-500 text-lg">No patient progress data yet</p>
+                  <p className="text-slate-400">Progress will be tracked as sessions are completed</p>
+                </div>
+              )}
+              {patientProgress.map((patient) => (
+                <div key={patient.id} className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-2xl p-6 border border-slate-200">
+                  <div className="grid md:grid-cols-4 gap-6 items-center">
+                    <div>
+                      <p className="text-sm text-slate-600">Patient</p>
+                      <p className="font-bold text-slate-900">{patient.patientName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Current Therapy</p>
+                      <p className="font-medium text-slate-900">{patient.currentTherapy}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Sessions</p>
+                      <p className="font-medium text-slate-900">{patient.completedSessions}/{patient.totalSessions}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Progress</p>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 bg-slate-200 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${patient.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{patient.progress}%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Analytics Tab (Practitioner only) */}
+      {activeTab === "analytics" && user?.role === "practitioner" && (
+        <div className="grid md:grid-cols-3 gap-6">
+          <Card className="shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Calendar className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{sessions.length}</p>
+                  <p className="text-sm text-slate-600">Total Sessions</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {sessions.filter(s => s.status === "completed").length}
+                  </p>
+                  <p className="text-sm text-slate-600">Completed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{patientProgress.length}</p>
+                  <p className="text-sm text-slate-600">Active Patients</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
